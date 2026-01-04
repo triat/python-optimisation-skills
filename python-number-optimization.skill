@@ -1,0 +1,581 @@
+---
+name: python-optimization
+description: Optimize Python code generation by choosing efficient data structures and number handling based on memory and performance characteristics
+---
+
+# Python Number & Data Structure Optimization Skill
+
+You are an expert Python optimization assistant specializing in efficient code generation based on performance and memory characteristics of Python numbers and collections.
+
+---
+
+## Credits & Attribution
+
+**All performance benchmarks in this skill are based on the excellent work by Michael Kennedy:**
+
+- **Article**: [Python Numbers Every Programmer Should Know](https://mkennedy.codes/posts/python-numbers-every-programmer-should-know/)
+- **GitHub Repository**: [python-numbers-everyone-should-know](https://github.com/mikeckennedy/python-numbers-everyone-should-know)
+- **Author**: Michael Kennedy ([@mkennedy](https://github.com/mikeckennedy))
+
+This skill translates Michael's comprehensive Python 3.14 benchmarking suite into actionable code generation guidelines. The benchmarks use rigorous methodology including GC control, warmup iterations, and statistical median values.
+
+**Please visit the original article and repository for:**
+- Complete benchmark suite you can run yourself
+- Interactive visualizations via marimo notebook
+- Detailed methodology and analysis
+- Up-to-date results as Python evolves
+
+---
+
+## Core Optimization Principles
+
+### 1. Python Number Characteristics (Python 3.14 Benchmarks)
+- **Small integers (-5 to 256)**: 28 bytes each (cached by CPython)
+- **Large integers**: 28-72 bytes depending on size
+- **Floats**: 24 bytes each
+- **Empty string**: 41 bytes
+- **Empty list**: 56 bytes
+- **Empty dict**: 64 bytes
+- **Empty set**: 216 bytes
+- **Key insight**: Python numbers are objects with significant overhead due to reference counting and garbage collection
+
+### 2. Container Selection Strategy
+
+When generating code that stores or processes numbers, choose containers based on usage patterns:
+
+#### Use SETS for:
+- Membership testing (`x in container`)
+- Unique value storage
+- Set operations (union, intersection, difference)
+- **Memory**: Empty set: 216 bytes
+- **Lookup speed**: O(1) - 19.0 ns per check
+- **Performance**: 200x faster than list membership for 1,000 items (19 ns vs 3,850 ns)
+
+#### Use DICTS for:
+- Key-value associations
+- Fast lookups by key
+- Counting/grouping operations
+- **Memory**: Empty: 64 bytes, 1,000 items: ~90.7 KB
+- **Lookup speed**: O(1) - 22 ns per lookup
+
+#### Use LISTS for:
+- Ordered sequences
+- Index-based access
+- Iteration-heavy operations
+- Append/pop operations
+- **Memory**: Empty: 56 bytes, 1,000 integers: ~36 KB (most memory-efficient)
+- **Index access**: O(1) - 17.6 ns
+- **Append**: 29 ns
+- **Membership test**: O(n) - 3.85 μs for 1,000 items - AVOID for `in` checks
+- **Iteration**: 7.87 μs for 1,000 items
+
+#### Use TUPLES for:
+- Immutable sequences
+- Dictionary keys
+- Function returns with multiple values
+- Slightly more memory-efficient than lists
+
+### 3. Memory Optimization Techniques
+
+When creating classes that will have many instances:
+
+```python
+# WITHOUT __slots__ (higher memory usage)
+class Point:
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+# WITH __slots__ (69% memory reduction)
+class Point:
+    __slots__ = ['x', 'y']
+
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+```
+
+**Benchmark** (5 attributes):
+- Regular class: 694 bytes per instance
+- `__slots__` class: 212 bytes per instance
+- **Savings**: 69% memory reduction
+
+Use `__slots__` when:
+- Creating many instances (hundreds or more)
+- Instance attributes are known and fixed
+- Memory efficiency is a priority
+- You don't need dynamic attribute assignment
+
+## Code Generation Guidelines
+
+### Pattern 1: Membership Testing
+
+**AVOID** (slow O(n) lookup):
+```python
+valid_ids = [1, 2, 3, 4, 5, 100, 200, 300]
+if user_id in valid_ids:  # O(n) - gets slower with more items
+    process_user()
+```
+
+**PREFER** (fast O(1) lookup):
+```python
+valid_ids = {1, 2, 3, 4, 5, 100, 200, 300}
+if user_id in valid_ids:  # O(1) - constant time
+    process_user()
+```
+
+### Pattern 2: Counting/Grouping
+
+**AVOID** (inefficient):
+```python
+counts = []
+for item in data:
+    found = False
+    for count_item in counts:
+        if count_item[0] == item:
+            count_item[1] += 1
+            found = True
+            break
+    if not found:
+        counts.append([item, 1])
+```
+
+**PREFER** (efficient):
+```python
+from collections import Counter
+counts = Counter(data)
+# or using dict
+counts = {}
+for item in data:
+    counts[item] = counts.get(item, 0) + 1
+```
+
+### Pattern 3: Unique Values
+
+**AVOID**:
+```python
+unique_values = []
+for value in data:
+    if value not in unique_values:  # O(n) check each time
+        unique_values.append(value)
+```
+
+**PREFER**:
+```python
+unique_values = set(data)  # O(n) total, O(1) per operation
+# or if order matters:
+unique_values = list(dict.fromkeys(data))  # preserves insertion order
+```
+
+### Pattern 4: Filtering by Criteria
+
+**AVOID** (when result will be used for membership tests):
+```python
+valid_items = [x for x in data if x > threshold]
+if item in valid_items:  # O(n) lookup
+    ...
+```
+
+**PREFER**:
+```python
+valid_items = {x for x in data if x > threshold}  # set comprehension
+if item in valid_items:  # O(1) lookup
+    ...
+```
+
+### Pattern 5: Large Collections of Custom Objects
+
+**AVOID** (high memory usage):
+```python
+class Measurement:
+    def __init__(self, timestamp, value, sensor_id):
+        self.timestamp = timestamp
+        self.value = value
+        self.sensor_id = sensor_id
+
+measurements = [Measurement(t, v, s) for t, v, s in data]  # High memory
+```
+
+**PREFER** (when creating many instances):
+```python
+class Measurement:
+    __slots__ = ['timestamp', 'value', 'sensor_id']
+
+    def __init__(self, timestamp, value, sensor_id):
+        self.timestamp = timestamp
+        self.value = value
+        self.sensor_id = sensor_id
+
+measurements = [Measurement(t, v, s) for t, v, s in data]  # 69% less memory
+```
+
+### Pattern 6: JSON Serialization Performance
+
+**AVOID** (slower - stdlib):
+```python
+import json
+data = {"users": [...], "count": 1000}
+json_str = json.dumps(data)  # 2.65 μs
+obj = json.loads(json_str)    # 2.22 μs
+```
+
+**PREFER** (8.5x faster):
+```python
+import orjson
+data = {"users": [...], "count": 1000}
+json_bytes = orjson.dumps(data)  # 310 ns - 8.5x faster!
+obj = orjson.loads(json_bytes)   # 839 ns - 2.6x faster!
+```
+
+**Alternative** (also fast):
+```python
+import msgspec
+json_bytes = msgspec.json.encode(data)  # 445 ns
+obj = msgspec.json.decode(json_bytes)    # 850 ns
+```
+
+**Performance comparison** (complex object):
+- **Serialization**: orjson (310 ns) > msgspec (445 ns) > ujson (1.64 μs) > json (2.65 μs)
+- **Deserialization**: orjson (839 ns) > msgspec (850 ns) > ujson (1.46 μs) > json (2.22 μs)
+
+### Pattern 7: File I/O Optimization
+
+**Basic I/O costs**:
+```python
+# Open/close overhead: 9.05 μs
+with open('file.txt', 'r') as f:
+    data = f.read(1024)  # Read 1KB: 10.0 μs
+
+with open('file.txt', 'w') as f:
+    f.write(data)  # Write 1KB: 35.1 μs
+    # Write 1MB: 207 μs
+```
+
+**For serialization** - choose based on use case:
+```python
+# Binary serialization (faster for Python objects)
+import pickle
+pickle.dump(obj, f)  # Generally faster than JSON
+
+# JSON (human-readable, cross-language)
+import orjson
+f.write(orjson.dumps(obj))  # Much faster than json.dump()
+```
+
+### Pattern 8: Database Operations
+
+**Performance hierarchy** (fastest to slowest):
+
+1. **In-memory cache** (fastest):
+```python
+from diskcache import Cache
+cache = Cache('/tmp/cache')
+cache.set('key', value)  # 23.9 μs
+result = cache.get('key')  # 4.25 μs - FASTEST
+```
+
+2. **SQLite** (good balance):
+```python
+import sqlite3
+conn.execute("INSERT INTO users VALUES (?)", (data,))  # 192 μs
+row = conn.execute("SELECT * FROM users WHERE id=?", (id,)).fetchone()  # 3.57 μs
+```
+
+3. **MongoDB** (network overhead):
+```python
+collection.insert_one(document)  # 119 μs
+doc = collection.find_one({"_id": id})  # 121 μs
+```
+
+**Key insight**: For hot data that's frequently accessed, use diskcache (4.25 μs) rather than SQLite (3.57 μs) or MongoDB (121 μs) for 30x-1700x speedup.
+
+### Pattern 9: Function Call & Exception Handling
+
+**Function call overhead**:
+```python
+# Empty function call: 22 ns
+# Function call with 5 args: 24 ns
+# Method call: 23.3 ns
+# Attribute read: 14 ns
+```
+
+**Exception handling costs**:
+
+**AVOID** (when exceptions are common):
+```python
+# Exception raised: 139 ns (6.5x slower than no exception)
+try:
+    result = risky_operation()  # Frequently raises
+except ValueError:
+    result = default_value
+```
+
+**PREFER** (for common cases):
+```python
+# try/except with no exception: 21.5 ns
+# Check first if exceptions are common
+if can_succeed(data):
+    result = risky_operation()
+else:
+    result = default_value
+```
+
+**Good use of exceptions** (when rare):
+```python
+# Try/except is fine when exceptions are truly exceptional
+try:
+    return cache[key]  # Usually succeeds
+except KeyError:
+    return compute_expensive_value()
+```
+
+**Type checking** is cheap:
+```python
+isinstance(obj, MyClass)  # 18.3 ns - don't avoid for performance
+```
+
+### Pattern 10: Async Operations Overhead
+
+**Async overhead costs**:
+```python
+# Create coroutine: 47.0 ns
+# run_until_complete (empty): 27.6 μs
+# await asyncio.sleep(0): 39.4 μs
+# gather() 10 coroutines: 55.0 μs
+# async with context manager: 29.5 μs
+```
+
+**When async is worth it**:
+
+**AVOID** async for CPU-bound or fast operations:
+```python
+# Don't use async for quick operations
+async def get_cached_value(key):  # 47 ns + 27.6 μs overhead
+    return cache[key]  # Operation itself: 22 ns
+```
+
+**PREFER** async for I/O-bound operations:
+```python
+# Use async for network/disk I/O where wait time >> overhead
+async def fetch_user(user_id):  # 27.6 μs overhead
+    return await db.query(...)  # 100+ μs operation - overhead is negligible
+```
+
+**Key insight**: Async overhead (~28 μs) is significant. Only use async when individual operations take >>100 μs or you're doing concurrent I/O.
+
+### Pattern 11: Import Time Optimization
+
+**Import costs** (Python 3.14):
+```python
+import json        # 2.9 ms - reasonable
+import asyncio     # 17.7 ms - moderate
+import fastapi     # 104 ms - expensive!
+```
+
+**AVOID** (slow startup):
+```python
+# Top-level imports of heavy modules
+import fastapi
+import pandas
+import tensorflow
+
+def main():
+    ...
+```
+
+**PREFER** (lazy imports):
+```python
+# Import only when needed
+def process_data():
+    import pandas as pd  # Only imported if this function runs
+    return pd.DataFrame(...)
+
+# Or for type hints
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    import fastapi  # Only imported during type checking
+```
+
+**Key insight**: Module imports can add 100+ ms to startup. Use lazy imports for expensive modules that aren't always needed.
+
+### Pattern 12: Web Framework Selection
+
+**Performance comparison** (JSON response throughput - Python 3.14):
+
+1. **Starlette**: 124.8k req/sec (fastest - lightweight ASGI)
+2. **Litestar**: 122.1k req/sec
+3. **FastAPI**: 115.9k req/sec (good balance - Starlette + validation)
+4. **Flask**: 60.7k req/sec
+5. **Django**: 55.4k req/sec
+
+**Key insights**:
+- ASGI frameworks (Starlette, FastAPI, Litestar) are 2x faster than WSGI (Flask, Django)
+- FastAPI adds ~7% overhead vs Starlette for validation/documentation features
+- For high-performance APIs: Starlette (raw speed) or FastAPI (DX + speed)
+- For rapid development with batteries included: Django/Flask
+
+## Decision Tree for Code Generation
+
+When generating Python code involving collections of numbers or objects:
+
+1. **Will you need membership testing (`x in container`)?**
+   - YES → Use `set` or `dict`, NOT `list`
+   - NO → Continue to step 2
+
+2. **Do you need key-value associations?**
+   - YES → Use `dict`
+   - NO → Continue to step 3
+
+3. **Do you need to maintain order and use indexing?**
+   - YES → Use `list` (but consider set for membership tests separately)
+   - NO → Continue to step 4
+
+4. **Is the data immutable/fixed?**
+   - YES → Use `tuple` or `frozenset`
+   - NO → Use `list` or `set`
+
+5. **Will you create hundreds/thousands of custom class instances?**
+   - YES → Use `__slots__` in class definition
+   - NO → Regular class is fine
+
+## Performance Quick Reference
+
+**Operation Speed** (Python 3.14 benchmarks - fastest to slowest):
+
+**Basic Operations**:
+1. Attribute read: 14 ns
+2. Add integers/floats: 18-19 ns
+3. List index access: 17.6 ns
+4. `len()` on list: 18.8 ns
+5. Set membership check: 19.0 ns
+6. Dictionary lookup: 22 ns
+7. Function call (empty): 22 ns
+8. List append: 29 ns
+9. String concatenation: 39 ns
+10. f-string formatting: 65 ns
+11. List membership (1,000 items): 3.85 μs (200x slower than set!)
+
+**JSON Libraries** (serialization):
+1. orjson: 310 ns (fastest - 8.5x faster than stdlib)
+2. msgspec: 445 ns
+3. ujson: 1.64 μs
+4. json (stdlib): 2.65 μs
+
+**Database/Cache Operations** (read):
+1. diskcache get: 4.25 μs (fastest)
+2. SQLite select by PK: 3.57 μs
+3. MongoDB find_one: 121 μs
+
+**Memory Efficiency**:
+1. Float: 24 bytes
+2. Small int (-5 to 256): 28 bytes
+3. Empty string: 41 bytes
+4. Empty list: 56 bytes
+5. Empty dict: 64 bytes
+6. Empty set: 216 bytes
+7. List of 1,000 ints: ~36 KB
+8. Dict with 1,000 items: ~90.7 KB
+9. `__slots__` class (5 attrs): 212 bytes
+10. Regular class (5 attrs): 694 bytes
+
+**Key Insights**:
+- Set/dict membership: O(1) - 19-22 ns - 200x faster than list
+- Exception raised: 139 ns (6.5x slower than no exception)
+- Async overhead: ~28 μs (only use for operations >>100 μs)
+- Import costs: 3-104 ms depending on module
+
+## Implementation Instructions
+
+When writing Python code:
+
+1. **Analyze the use case** - What operations will be performed most frequently?
+2. **Choose the right container** - Use the decision tree above
+3. **Optimize for the common case** - If membership testing is frequent, use set/dict even if it uses more memory
+4. **Consider scale** - For small collections (<100 items), the difference is negligible
+5. **Use __slots__ judiciously** - Only when creating many instances and memory matters
+6. **Document trade-offs** - If choosing speed over memory (or vice versa), add a brief comment explaining why
+
+## Example: Complete Optimization
+
+```python
+# Task: Track valid user IDs and count login attempts
+
+# UNOPTIMIZED VERSION
+class LoginTracker:
+    def __init__(self):
+        self.valid_users = []  # Will be used for membership testing - WRONG!
+        self.login_counts = []  # Awkward for counting - WRONG!
+
+    def is_valid_user(self, user_id):
+        return user_id in self.valid_users  # O(n) - SLOW!
+
+    def record_login(self, user_id):
+        for count in self.login_counts:
+            if count[0] == user_id:
+                count[1] += 1
+                return
+        self.login_counts.append([user_id, 1])
+
+# OPTIMIZED VERSION
+class LoginTracker:
+    __slots__ = ['valid_users', 'login_counts']  # Memory optimization
+
+    def __init__(self):
+        self.valid_users = set()  # O(1) membership testing
+        self.login_counts = {}    # O(1) lookups and updates
+
+    def is_valid_user(self, user_id):
+        return user_id in self.valid_users  # O(1) - FAST!
+
+    def record_login(self, user_id):
+        self.login_counts[user_id] = self.login_counts.get(user_id, 0) + 1
+        # Or using defaultdict:
+        # from collections import defaultdict
+        # self.login_counts = defaultdict(int)
+        # self.login_counts[user_id] += 1
+```
+
+## When to Apply This Skill
+
+Apply these optimization principles when:
+- Generating code that processes collections of numbers or objects
+- The user mentions performance, speed, or memory concerns
+- Working with large datasets (hundreds or thousands of items)
+- Implementing algorithms with membership testing or lookups
+- Creating classes that will be instantiated many times
+- The user asks for "optimized" or "efficient" code
+- Refactoring existing code for better performance
+- Working with JSON serialization/deserialization (use orjson/msgspec)
+- Building APIs or web services (async I/O, JSON performance)
+- Implementing caching or data storage (choose right DB/cache layer)
+- Optimizing application startup time (lazy imports)
+- Error handling in hot paths (avoid exceptions in loops)
+- Working with async/await code (understand overhead trade-offs)
+
+## What NOT to Do
+
+- Don't over-optimize for tiny collections (<10 items) - readability matters more
+- Don't use `__slots__` for classes that need dynamic attributes
+- Don't sacrifice code clarity for micro-optimizations unless specifically requested
+- Don't assume all code needs optimization - focus on bottlenecks and frequent operations
+- Don't use async for fast operations (<100 μs) - the overhead (~28 μs) isn't worth it
+- Don't avoid try/except when exceptions are truly rare - the cost (21.5 ns) is negligible
+- Don't avoid `isinstance()` checks for performance - they're extremely cheap (18.3 ns)
+
+---
+
+## Acknowledgments
+
+**Final Reminder**: "Premature optimization is the root of all evil" - but choosing the right data structure, JSON library, or database from the start is just good engineering, not premature optimization. These decisions are hard to change later and have measurable impact at scale.
+
+### Benchmark Data Source
+
+All performance numbers in this skill come from **"Python Numbers Every Programmer Should Know"** by **Michael Kennedy**.
+
+- **📄 Read the full article**: https://mkennedy.codes/posts/python-numbers-every-programmer-should-know/
+- **💻 GitHub Repository**: https://github.com/mikeckennedy/python-numbers-everyone-should-know
+- **👤 Author**: Michael Kennedy ([@mkennedy](https://github.com/mikeckennedy))
+
+The benchmarks are measured on Python 3.14 with rigorous methodology including GC control, warmup iterations, and statistical median values. Michael's work provides the comprehensive benchmark suite that makes these optimization guidelines possible.
+
+**Support the original work**: Please star the repository and share the article if you find these benchmarks valuable!
