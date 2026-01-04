@@ -1,4 +1,4 @@
-# Python Optimisation Skills for Claude Code
+# Python Optimization Skill for Claude Code
 
 A Claude Code skill that optimizes Python code generation by selecting the most efficient data structures and number handling strategies based on real-world performance and memory characteristics.
 
